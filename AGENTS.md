@@ -56,9 +56,12 @@ Hecho: Fases 1-6, pasos 1-4 de la Fase 7, scripts de los pasos 5-7
 (CrystalNightGlow, Setup Crystal Glow, Setup Region B Volume y Optimize Static),
 plan de pruebas, documentación académica en borrador, script Tools/ECHO/Build Windows y
 ajustes de escala/densidad en BuildRegionA/B con ForestScatter, niebla interpolada
-por fase en TimeOfDayController y script SetupVfx para recogida y portales
+por fase en TimeOfDayController, script SetupVfx para recogida y portales y
+SetupPlayerCharacter para modelo, animaciones, controller, prefab y jerarquía
 (compilados estáticamente, sin ejecutar en Unity).
-Pendiente: ejecutar Tools/ECHO/Setup Fragment Pickup VFX y Tools/ECHO/Setup Portal VFX;
+Pendiente: ejecutar Tools/ECHO/Setup Player Character y verificar importación Humanoid,
+materiales URP, animaciones, AC_Player, PlayerModel y jerarquía del Player;
+ejecutar Tools/ECHO/Setup Fragment Pickup VFX y Tools/ECHO/Setup Portal VFX;
 ejecutar Tools/ECHO/Build Region A, Tools/ECHO/Build Region B y Tools/ECHO/Optimize Static;
 restaurar las fases del TimeOfDayController si los campos de niebla no se actualizan solos;
 compilar con Tools/ECHO/Build Windows y probar el .exe; completar la columna "Resultado real"
