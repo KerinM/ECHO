@@ -22,6 +22,10 @@ namespace Echo.Mission
         [SerializeField] private float bobAmplitude = 0.15f;
         [SerializeField] private float bobSpeed = 2f;
 
+        [Header("Efectos")]
+        [Tooltip("Prefab opcional que se instancia al recoger el fragmento.")]
+        [SerializeField] private GameObject pickupEffect;
+
         private bool collected;
         private Vector3 visualStartLocalPosition;
         private float bobPhase;
@@ -75,6 +79,12 @@ namespace Echo.Mission
             if (!mission.CollectFragment(fragmentId)) return;
 
             collected = true;
+
+            if (pickupEffect != null)
+            {
+                Instantiate(pickupEffect, transform.position, Quaternion.identity);
+            }
+
             gameObject.SetActive(false);
         }
     }

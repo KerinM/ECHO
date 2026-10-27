@@ -16,9 +16,10 @@ Los identificadores de código van en inglés.
 - Referencias por [SerializeField] con comprobaciones y Debug.LogError claros.
   Sin FindObjectOfType en Update. Eventos para comunicar sistemas.
 
-## Estructura (Assets/_Project/)
+## Estructura (carpetas directamente bajo Assets/)
 Scenes, Scripts (Player, Camera, Environment, Portals, Interactions, Mission, UI, Editor),
 Materials, Prefabs, Models (Kenney_NatureKit, Kenney_CastleKit), Textures, Audio, VFX.
+Los scripts de Editor van en Assets/Scripts/Editor.
 
 ## Scripts existentes (no cambiar su API sin actualizar todos los usos)
 - Echo.Player.PlayerController: SetControlEnabled(bool), Teleport(Vector3, Quaternion)
@@ -28,6 +29,8 @@ Materials, Prefabs, Models (Kenney_NatureKit, Kenney_CastleKit), Textures, Audio
 - Echo.Portals: PortalController, PortalTraveler
 - Echo.Mission: MissionManager (eventos), EnergyFragment, AncestralCore, VictoryController
 - Echo.UI: ScreenFader, InteractionPromptUI, GameUIController, IntroPanelUI
+- Echo.Player.PlayerAnimator: lee el CharacterController y alimenta el Animator del modelo
+  (parámetros Speed float, Grounded bool, Interact trigger, Victory trigger). Métodos PlayInteract(), PlayVictory().
 
 ## Mundo
 - Región A centro (0,0,0); Región B centro (200,0,0). Cada suelo mide 80x80 m.
@@ -49,5 +52,15 @@ Materials, Prefabs, Models (Kenney_NatureKit, Kenney_CastleKit), Textures, Audio
   Termina cada tarea con "Qué verificar en Unity" (pasos concretos) y "Errores probables".
 
 ## Estado (actualizar al terminar cada tarea)
-Hecho: Fases 1-6 y pasos 1-2 de la Fase 7 (ver docs/Fase7_Escenario.md).
-Pendiente: pasos 3-7 de la Fase 7; Fase 8 (prueba completa, build para Windows, documentación académica).
+Hecho: Fases 1-6, pasos 1-4 de la Fase 7, scripts de los pasos 5-7
+(CrystalNightGlow, Setup Crystal Glow, Setup Region B Volume y Optimize Static),
+plan de pruebas, documentación académica en borrador, script Tools/ECHO/Build Windows y
+ajustes de escala/densidad en BuildRegionA/B con ForestScatter, niebla interpolada
+por fase en TimeOfDayController y script SetupVfx para recogida y portales
+(compilados estáticamente, sin ejecutar en Unity).
+Pendiente: ejecutar Tools/ECHO/Setup Fragment Pickup VFX y Tools/ECHO/Setup Portal VFX;
+ejecutar Tools/ECHO/Build Region A, Tools/ECHO/Build Region B y Tools/ECHO/Optimize Static;
+restaurar las fases del TimeOfDayController si los campos de niebla no se actualizan solos;
+compilar con Tools/ECHO/Build Windows y probar el .exe; completar la columna "Resultado real"
+de docs/PlanDePruebas.md; medir Stats (paso 7); cotejar criterios y documentación con el
+enunciado original y cerrar la Fase 8.

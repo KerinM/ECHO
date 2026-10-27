@@ -233,6 +233,7 @@ MonoBehaviour:
   spinSpeed: 90
   bobAmplitude: 0.15
   bobSpeed: 2
+  pickupEffect: {fileID: 6550545671200637519, guid: 6d16574f543b1794580bfc0dec47c1b5, type: 3}
 --- !u!1 &7994999614513256048
 GameObject:
   m_ObjectHideFlags: 0

@@ -22,6 +22,8 @@ namespace Echo.World
         public Color ambientSky = Color.gray;
         public Color ambientEquator = Color.gray;
         public Color ambientGround = Color.gray;
+        public Color fogColor = new Color(0.62f, 0.78f, 0.92f);
+        [Range(0f, 0.02f)] public float fogDensity = 0.003f;
     }
 
     /// <summary>
@@ -108,6 +110,8 @@ namespace Echo.World
             baseShadows = sunLight.shadows;
             RenderSettings.sun = sunLight;
             RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.fog = true;
+            RenderSettings.fogMode = FogMode.ExponentialSquared;
 
             SetupSkybox();
             CacheNightLights();
@@ -200,6 +204,10 @@ namespace Echo.World
             RenderSettings.ambientSkyColor = Color.Lerp(a.ambientSky, b.ambientSky, k);
             RenderSettings.ambientEquatorColor = Color.Lerp(a.ambientEquator, b.ambientEquator, k);
             RenderSettings.ambientGroundColor = Color.Lerp(a.ambientGround, b.ambientGround, k);
+
+            RenderSettings.fogColor = Color.Lerp(a.fogColor, b.fogColor, k);
+            RenderSettings.fogDensity = Mathf.Clamp(
+                Mathf.Lerp(a.fogDensity, b.fogDensity, k), 0f, 0.02f);
 
             // 4) Cielo.
             if (runtimeSkybox != null)
@@ -297,30 +305,41 @@ namespace Echo.World
             return new List<DayPhase>
             {
                 P("Noche",       0.00f, new Color(0.35f, 0.45f, 0.80f), 0.00f, new Color(0.25f, 0.30f, 0.55f), 0.50f, 0.8f,
-                  new Color(0.08f, 0.11f, 0.24f), new Color(0.06f, 0.08f, 0.18f), new Color(0.03f, 0.04f, 0.08f)),
+                  new Color(0.08f, 0.11f, 0.24f), new Color(0.06f, 0.08f, 0.18f), new Color(0.03f, 0.04f, 0.08f),
+                  new Color(0.03f, 0.05f, 0.12f), 0.010f),
                 P("Noche",       0.20f, new Color(0.35f, 0.45f, 0.80f), 0.00f, new Color(0.25f, 0.30f, 0.55f), 0.50f, 0.8f,
-                  new Color(0.08f, 0.11f, 0.24f), new Color(0.06f, 0.08f, 0.18f), new Color(0.03f, 0.04f, 0.08f)),
+                  new Color(0.08f, 0.11f, 0.24f), new Color(0.06f, 0.08f, 0.18f), new Color(0.03f, 0.04f, 0.08f),
+                  new Color(0.03f, 0.05f, 0.12f), 0.010f),
                 P("Amanecer",    0.26f, new Color(1.00f, 0.62f, 0.40f), 0.25f, new Color(0.95f, 0.60f, 0.50f), 1.00f, 1.3f,
-                  new Color(0.45f, 0.40f, 0.50f), new Color(0.50f, 0.40f, 0.40f), new Color(0.25f, 0.20f, 0.20f)),
+                  new Color(0.45f, 0.40f, 0.50f), new Color(0.50f, 0.40f, 0.40f), new Color(0.25f, 0.20f, 0.20f),
+                  new Color(0.75f, 0.50f, 0.42f), 0.007f),
                 P("Mañana",      0.33f, new Color(1.00f, 0.82f, 0.62f), 1.00f, new Color(0.60f, 0.55f, 0.50f), 1.20f, 1.1f,
-                  new Color(0.50f, 0.58f, 0.75f), new Color(0.58f, 0.58f, 0.60f), new Color(0.30f, 0.28f, 0.26f)),
+                  new Color(0.50f, 0.58f, 0.75f), new Color(0.58f, 0.58f, 0.60f), new Color(0.30f, 0.28f, 0.26f),
+                  new Color(0.68f, 0.76f, 0.86f), 0.005f),
                 P("Día",         0.45f, new Color(1.00f, 0.96f, 0.88f), 1.20f, new Color(0.50f, 0.50f, 0.50f), 1.30f, 1.0f,
-                  new Color(0.50f, 0.65f, 0.90f), new Color(0.60f, 0.65f, 0.70f), new Color(0.30f, 0.30f, 0.28f)),
+                  new Color(0.50f, 0.65f, 0.90f), new Color(0.60f, 0.65f, 0.70f), new Color(0.30f, 0.30f, 0.28f),
+                  new Color(0.62f, 0.78f, 0.92f), 0.003f),
                 P("Día",         0.55f, new Color(1.00f, 0.96f, 0.88f), 1.20f, new Color(0.50f, 0.50f, 0.50f), 1.30f, 1.0f,
-                  new Color(0.50f, 0.65f, 0.90f), new Color(0.60f, 0.65f, 0.70f), new Color(0.30f, 0.30f, 0.28f)),
+                  new Color(0.50f, 0.65f, 0.90f), new Color(0.60f, 0.65f, 0.70f), new Color(0.30f, 0.30f, 0.28f),
+                  new Color(0.62f, 0.78f, 0.92f), 0.003f),
                 P("Tarde",       0.67f, new Color(1.00f, 0.70f, 0.45f), 1.00f, new Color(0.85f, 0.55f, 0.40f), 1.10f, 1.3f,
-                  new Color(0.50f, 0.50f, 0.60f), new Color(0.60f, 0.48f, 0.42f), new Color(0.30f, 0.25f, 0.22f)),
+                  new Color(0.50f, 0.50f, 0.60f), new Color(0.60f, 0.48f, 0.42f), new Color(0.30f, 0.25f, 0.22f),
+                  new Color(0.82f, 0.66f, 0.48f), 0.005f),
                 P("Atardecer",   0.74f, new Color(1.00f, 0.45f, 0.25f), 0.25f, new Color(1.00f, 0.42f, 0.30f), 1.00f, 1.5f,
-                  new Color(0.50f, 0.35f, 0.40f), new Color(0.60f, 0.35f, 0.30f), new Color(0.30f, 0.20f, 0.18f)),
+                  new Color(0.50f, 0.35f, 0.40f), new Color(0.60f, 0.35f, 0.30f), new Color(0.30f, 0.20f, 0.18f),
+                  new Color(0.90f, 0.45f, 0.25f), 0.008f),
                 P("Crepúsculo",  0.79f, new Color(0.90f, 0.35f, 0.45f), 0.00f, new Color(0.60f, 0.30f, 0.50f), 0.70f, 1.2f,
-                  new Color(0.20f, 0.18f, 0.35f), new Color(0.25f, 0.15f, 0.25f), new Color(0.10f, 0.08f, 0.12f)),
+                  new Color(0.20f, 0.18f, 0.35f), new Color(0.25f, 0.15f, 0.25f), new Color(0.10f, 0.08f, 0.12f),
+                  new Color(0.38f, 0.28f, 0.42f), 0.010f),
                 P("Noche",       0.87f, new Color(0.35f, 0.45f, 0.80f), 0.00f, new Color(0.25f, 0.30f, 0.55f), 0.50f, 0.8f,
-                  new Color(0.08f, 0.11f, 0.24f), new Color(0.06f, 0.08f, 0.18f), new Color(0.03f, 0.04f, 0.08f)),
+                  new Color(0.08f, 0.11f, 0.24f), new Color(0.06f, 0.08f, 0.18f), new Color(0.03f, 0.04f, 0.08f),
+                  new Color(0.03f, 0.05f, 0.12f), 0.010f),
             };
         }
 
         private static DayPhase P(string name, float time, Color light, float intensity, Color skyTint,
-                                  float exposure, float atmosphere, Color ambSky, Color ambEq, Color ambGround)
+                                  float exposure, float atmosphere, Color ambSky, Color ambEq, Color ambGround,
+                                  Color fog, float fogDensity)
         {
             return new DayPhase
             {
@@ -333,7 +352,9 @@ namespace Echo.World
                 atmosphereThickness = atmosphere,
                 ambientSky = ambSky,
                 ambientEquator = ambEq,
-                ambientGround = ambGround
+                ambientGround = ambGround,
+                fogColor = fog,
+                fogDensity = fogDensity
             };
         }
     }

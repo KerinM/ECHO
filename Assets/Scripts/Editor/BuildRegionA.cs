@@ -15,6 +15,15 @@ namespace Echo.EditorTools
         private const string CastleModels = "Assets/Models/Kenney_CastleKit/FBX format";
         private const float FreeRadius = 3f;
         private const float PathClearance = 2.5f;
+        private const uint ForestSeed = 0x5EEDA001u;
+        private const int ExtraTreeCount = 36;
+        private const int ExtraBushCount = 60;
+        private const int ExtraRockCount = 32;
+
+        private static readonly Vector2 TreeScaleRange = new Vector2(2.5f, 3.5f);
+        private static readonly Vector2 BushScaleRange = new Vector2(1.8f, 2.2f);
+        private static readonly Vector2 RockScaleRange = new Vector2(2f, 3f);
+        private static readonly Vector2 StoneScaleRange = new Vector2(1.7f, 1.9f);
 
         private enum ModelType
         {
@@ -135,7 +144,8 @@ namespace Echo.EditorTools
         };
 
         private static readonly List<Vector3> ProtectedPoints = new List<Vector3>();
-        private static readonly List<Vector3> PathPoints = new List<Vector3>();
+        private static readonly List<ForestScatter.Segment> PathSegments = new List<ForestScatter.Segment>();
+        private static readonly List<ForestScatter.Footprint> Footprints = new List<ForestScatter.Footprint>();
 
         private static Material stone;
         private static Material stoneDark;
@@ -191,42 +201,65 @@ namespace Echo.EditorTools
             ProtectedPoints.Add(ResolvePoint("PlayerSpawn", new Vector3(0f, 0.1f, -25f)));
             ProtectedPoints.Add(ResolvePoint("Marker_Fragment1", new Vector3(-25f, 1f, 20f)));
             ProtectedPoints.Add(ResolvePoint("Marker_PortalA", new Vector3(30f, 0f, 10f)));
+            ProtectedPoints.Add(ResolvePoint("Marker_PortalA_Arrival", new Vector3(30f, 0.1f, 4f)));
             ProtectedPoints.Add(ResolvePoint("AncestralCore", new Vector3(0f, 0f, 30f)));
-            PathPoints.Clear();
 
             Transform decor = GetOrCreateContainer(region.transform, "Decor_A");
             Transform path = GetOrCreateContainer(region.transform, "Path_A");
             Transform lanterns = GetOrCreateContainer(region.transform, "Lanterns_A");
 
-            int slabCount = BuildPath(path, region.transform);
+            PathSegments.Clear();
+            ForestScatter.AddPolylineSegments(PathSegments, PathPositions, region.transform);
+            Footprints.Clear();
+
+            ForestScatter.Rng rng = new ForestScatter.Rng(ForestSeed);
+            Placement[] scaledColumnPlacements = ScalePlacements(ColumnPlacements, StoneScaleRange, ref rng);
+            Placement[] scaledWallPlacements = ScalePlacements(WallPlacements, StoneScaleRange, ref rng);
+            Placement[] scaledTreePlacements = ScalePlacements(TreePlacements, TreeScaleRange, ref rng);
+            Placement[] scaledBushPlacements = ScalePlacements(BushPlacements, BushScaleRange, ref rng);
+            Placement[] scaledRockPlacements = ScalePlacements(RockPlacements, RockScaleRange, ref rng);
+
+            int slabCount = BuildPath(path);
 
             int columnCount = PlaceSeries(
                 new[] { column, column, columnDamaged, columnDamaged },
-                ColumnPlacements, decor, "Column", "columna", true);
+                scaledColumnPlacements, decor, "Column", "columna", true, false, 0.7f);
 
             int wallCount = PlaceSeries(
                 new[] { wallHalf, wallHalf, wallCornerHalf },
-                WallPlacements, decor, "Wall", "muro", true);
+                scaledWallPlacements, decor, "Wall", "muro", true, false, 1f);
 
             int treeCount = PlaceSeries(
                 new[] { treeDefault, treeOak, treePine },
-                TreePlacements, decor, "Tree", "árbol", true);
+                scaledTreePlacements, decor, "Tree", "árbol", true, false, 0.5f);
 
             int bushCount = PlaceSeries(
                 new[] { bush, bushDetailed },
-                BushPlacements, decor, "Bush", "arbusto", true);
+                scaledBushPlacements, decor, "Bush", "arbusto", true, false, 0.4f);
 
             int rockCount = PlaceSeries(
                 new[] { rockLarge, rockSmall },
-                RockPlacements, decor, "Rock", "roca", true);
+                scaledRockPlacements, decor, "Rock", "roca", true, false, 0.55f);
 
             int cliffRockCount = PlaceSeries(
                 new[] { rockLarge },
-                CliffRockPlacements, decor, "Cliff_Rock", "roca de acantilado", true);
+                CliffRockPlacements, decor, "Cliff_Rock", "roca de acantilado", true, false, 0.7f);
 
             int lanternCount = PlaceSeries(
                 new[] { lantern },
-                LanternPlacements, lanterns, "Lantern", "farol", false);
+                LanternPlacements, lanterns, "Lantern", "farol", false, false, 0.3f);
+
+            int denseTreeCount = PlaceProceduralSeries(
+                new[] { treeDefault, treeOak, treePine },
+                ExtraTreeCount, decor, "Tree_Dense", "árbol denso", TreeScaleRange, 0.5f, ref rng);
+
+            int denseBushCount = PlaceProceduralSeries(
+                new[] { bush, bushDetailed },
+                ExtraBushCount, decor, "Bush_Dense", "arbusto denso", BushScaleRange, 0.4f, ref rng);
+
+            int denseRockCount = PlaceProceduralSeries(
+                new[] { rockLarge, rockSmall },
+                ExtraRockCount, decor, "Rock_Dense", "roca decorativa", RockScaleRange, 0.55f, ref rng);
 
             int lampCount = WireNightLights(lanterns);
 
@@ -237,8 +270,11 @@ namespace Echo.EditorTools
             EditorGUIUtility.PingObject(region);
 
             Debug.Log($"[ECHO] Región A construida: {slabCount} losas, {columnCount} columnas, {wallCount} muros, " +
-                      $"{treeCount} árboles, {bushCount} arbustos, {rockCount} rocas, {cliffRockCount} rocas de acantilado, " +
-                      $"{lanternCount} faroles y {lampCount} luces enlazadas.", region);
+                      $"{treeCount} árboles base + {denseTreeCount} nuevos, " +
+                      $"{bushCount} arbustos base + {denseBushCount} nuevos, " +
+                      $"{rockCount} rocas base + {denseRockCount} nuevas, " +
+                      $"{cliffRockCount} rocas de acantilado, {lanternCount} faroles y {lampCount} luces enlazadas. " +
+                      $"Semilla {ForestSeed:X8}.", region);
         }
 
         private static bool LoadMaterials()
@@ -546,7 +582,7 @@ namespace Echo.EditorTools
             return container;
         }
 
-        private static int BuildPath(Transform container, Transform region)
+        private static int BuildPath(Transform container)
         {
             for (int i = 0; i < PathPositions.Length; i++)
             {
@@ -564,14 +600,20 @@ namespace Echo.EditorTools
                 {
                     renderer.sharedMaterial = stone;
                 }
-
-                PathPoints.Add(region.TransformPoint(new Vector3(point.x, 0f, point.y)));
             }
 
             return PathPositions.Length;
         }
 
-        private static int PlaceSeries(GameObject[] prefabs, Placement[] placements, Transform parent, string prefix, string category, bool checkPath)
+        private static int PlaceSeries(
+            GameObject[] prefabs,
+            Placement[] placements,
+            Transform parent,
+            string prefix,
+            string category,
+            bool checkPath,
+            bool checkFootprints,
+            float footprintBaseRadius)
         {
             int placed = 0;
 
@@ -585,9 +627,10 @@ namespace Echo.EditorTools
 
                 Placement placement = placements[i];
                 Vector3 worldPosition = parent.TransformPoint(placement.Position);
-                if (!IsFree(worldPosition, checkPath))
+                float footprintRadius = footprintBaseRadius * placement.Scale;
+                if (!IsFree(worldPosition, checkPath, checkFootprints, footprintRadius))
                 {
-                    Debug.LogWarning($"[ECHO] {category} {i + 1:00} omitido: invade el radio libre de 3 m en {placement.Position}.");
+                    Debug.LogWarning($"[ECHO] {category} {i + 1:00} omitido: invade una zona protegida, el camino u otra pieza.");
                     continue;
                 }
 
@@ -597,35 +640,116 @@ namespace Echo.EditorTools
                 instance.transform.localPosition = placement.Position;
                 instance.transform.localRotation = Quaternion.Euler(0f, placement.Yaw, 0f);
                 instance.transform.localScale = Vector3.one * placement.Scale;
+
+                Footprints.Add(new ForestScatter.Footprint(
+                    new Vector2(worldPosition.x, worldPosition.z),
+                    footprintRadius));
                 placed++;
             }
 
             return placed;
         }
 
-        private static bool IsFree(Vector3 worldPosition, bool checkPath)
+        private static int PlaceProceduralSeries(
+            GameObject[] prefabs,
+            int targetCount,
+            Transform parent,
+            string prefix,
+            string category,
+            Vector2 scaleRange,
+            float footprintBaseRadius,
+            ref ForestScatter.Rng rng)
         {
-            foreach (Vector3 point in ProtectedPoints)
+            int placed = 0;
+            int attempts = 0;
+            int maxAttempts = Mathf.Max(targetCount * 80, 800);
+
+            while (placed < targetCount && attempts < maxAttempts)
             {
-                float dx = worldPosition.x - point.x;
-                float dz = worldPosition.z - point.z;
+                attempts++;
+                Vector2 localPosition = ForestScatter.SampleAnnulus(
+                    ref rng,
+                    ForestScatter.InnerRadius,
+                    ForestScatter.OuterRadius);
+                Vector3 local = new Vector3(localPosition.x, 0f, localPosition.y);
+                Vector3 worldPosition = parent.TransformPoint(local);
+                float scale = rng.Range(scaleRange.x, scaleRange.y);
+                float footprintRadius = footprintBaseRadius * scale;
+
+                if (!IsFree(worldPosition, true, true, footprintRadius))
+                {
+                    continue;
+                }
+
+                GameObject prefab = prefabs[placed % prefabs.Length];
+                if (prefab == null)
+                {
+                    continue;
+                }
+
+                GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+                Undo.RegisterCreatedObjectUndo(instance, "Build Region A");
+                instance.name = $"{prefix}_{placed + 1:00}";
+                instance.transform.localPosition = local;
+                instance.transform.localRotation = Quaternion.Euler(0f, rng.Range(0f, 360f), 0f);
+                instance.transform.localScale = Vector3.one * scale;
+
+                Footprints.Add(new ForestScatter.Footprint(
+                    new Vector2(worldPosition.x, worldPosition.z),
+                    footprintRadius));
+                placed++;
+            }
+
+            if (placed < targetCount)
+            {
+                Debug.LogWarning(
+                    $"[ECHO] {category}: solo se colocaron {placed}/{targetCount} piezas tras {attempts} intentos. " +
+                    "Revisa el radio libre, los caminos y la separación entre piezas.",
+                    parent);
+            }
+
+            return placed;
+        }
+
+        private static Placement[] ScalePlacements(Placement[] source, Vector2 scaleRange, ref ForestScatter.Rng rng)
+        {
+            Placement[] result = new Placement[source.Length];
+            for (int i = 0; i < source.Length; i++)
+            {
+                Placement placement = source[i];
+                result[i] = new Placement(
+                    placement.Position.x,
+                    placement.Position.y,
+                    placement.Position.z,
+                    placement.Yaw,
+                    rng.Range(scaleRange.x, scaleRange.y));
+            }
+
+            return result;
+        }
+
+        private static bool IsFree(Vector3 worldPosition, bool checkPath, bool checkFootprints, float footprintRadius)
+        {
+            Vector2 point = new Vector2(worldPosition.x, worldPosition.z);
+
+            foreach (Vector3 protectedPoint in ProtectedPoints)
+            {
+                float dx = worldPosition.x - protectedPoint.x;
+                float dz = worldPosition.z - protectedPoint.z;
                 if (dx * dx + dz * dz < FreeRadius * FreeRadius)
                 {
                     return false;
                 }
             }
 
-            if (checkPath)
+            if (checkPath && ForestScatter.IsNearPath(point, PathSegments, PathClearance))
             {
-                foreach (Vector3 point in PathPoints)
-                {
-                    float dx = worldPosition.x - point.x;
-                    float dz = worldPosition.z - point.z;
-                    if (dx * dx + dz * dz < PathClearance * PathClearance)
-                    {
-                        return false;
-                    }
-                }
+                return false;
+            }
+
+            if (checkFootprints && ForestScatter.OverlapsAny(point, footprintRadius, Footprints))
+            {
+                return false;
             }
 
             return true;
