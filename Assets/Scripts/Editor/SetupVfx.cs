@@ -121,7 +121,8 @@ namespace Echo.EditorTools
             }
         }
 
-        private static Material EnsureParticleMaterial()
+        // Ahora visible para SetupAmbience (Bloque 3): mismo material aditivo compartido.
+        internal static Material EnsureParticleMaterial()
         {
             Shader shader = Shader.Find(ParticleShaderName);
             if (shader == null)

@@ -28,6 +28,9 @@ namespace Echo.Interactions
         /// <summary>Se dispara solo cuando cambia el objetivo enfocado (incluye null).</summary>
         public event Action<Interactable> FocusChanged;
 
+        /// <summary>Se dispara después de que el jugador ejecuta una interacción válida (etapa 2).</summary>
+        public event Action<Interactable> Interacted;
+
         private void Awake()
         {
             if (interactableMask.value == 0)
@@ -59,6 +62,7 @@ namespace Echo.Interactions
             if (current != null && Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
             {
                 current.Interact(gameObject);
+                Interacted?.Invoke(current);
             }
         }
 

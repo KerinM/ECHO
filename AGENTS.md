@@ -109,6 +109,10 @@ PlayerAnimator solo lee el estado: no mueve al personaje. Apply Root Motion desa
 - El Canvas del fundido (FadeCanvas) se ve enorme en la ventana Scene: es normal.
 - El nombre del script y de la clase deben coincidir (hubo un EnergyFragment..cs).
 - Los avisos "Identifier uniqueness violation" de los FBX de Kenney son inofensivos.
+- Controller.AddLayer no garantiza que la AnimatorStateMachine de la capa nueva quede como sub-asset
+  del .controller: el build falla con "Statemachine for layer 'X' is missing". Comprobar con
+  AssetDatabase.GetAssetPath y usar AddObjectToAsset; RemoveLayer tampoco borra esa sub-asset
+  (limpiar huérfanas con LoadAllAssetsAtPath).
 - Si el proyecto muestra "Default Render Pipeline: None" en Graphics, asignar PC_RPAsset ahí.
 
 ## Estado (actualizar al terminar cada bloque)
@@ -119,9 +123,12 @@ Verificado en Unity por el usuario:
 - Personaje Mixamo con Idle, Walk y Run funcionando.
 Escrito pero sin verificar en Unity (verificar antes de depender de ello):
 - CrystalNightGlow / Setup Crystal Glow, Optimize Static, niebla por fase, Setup Fragment Pickup VFX,
-  Setup Portal VFX, Build Windows, ForestScatter. Si TimeOfDayController no refleja los campos
+  Setup Portal VFX, Build Windows, ForestScatter, BuildCliffDressing (Bloque 1),
+  StarField / AmbientParticles / Setup Ambience (Bloque 3),
+  Setup Player Character etapa 2 (Bloque 5: gestos, máscara, PlayerReactions),
+  ObjectiveBeacon / Setup Objective Beacon / Setup Credits / reloj F1 (Bloque 7). Si TimeOfDayController no refleja los campos
   de niebla, usar "Restaurar fases por defecto" en su menú contextual.
-Pendiente: los bloques de la fase de pulido y la Fase 8.
+Pendiente: los bloques 2, 4, 6 y 8 de la fase de pulido y la Fase 8.
 
 # FASE DE PULIDO PARA LA ENTREGA FINAL
 

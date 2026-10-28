@@ -57,8 +57,11 @@ namespace Echo.World
         [SerializeField] private List<DayPhase> phases = CreateDefaultPhases();
 
         [Header("Pruebas rápidas")]
-        [Tooltip("Teclas: F (mantener) acelera, P pausa, 1 amanecer, 2 mediodía, 3 atardecer, 4 medianoche.")]
+        [Tooltip("Teclas: F (mantener) acelera, P pausa, 1 amanecer, 2 mediodía, 3 atardecer, 4 medianoche, " +
+                 "F1 alterna el indicador de hora.")]
         [SerializeField] private bool enableDebugKeys = true;
+        [Tooltip("El indicador de hora (OnGUI) empieza oculto y se alterna con F1.")]
+        [SerializeField] private bool showClock = false;
         [SerializeField] private float debugFastMultiplier = 20f;
 
         private static readonly int SkyTintId = Shader.PropertyToID("_SkyTint");
@@ -278,6 +281,7 @@ namespace Echo.World
 
             if (kb.fKey.isPressed) currentMultiplier *= debugFastMultiplier;
             if (kb.pKey.wasPressedThisFrame) paused = !paused;
+            if (kb.f1Key.wasPressedThisFrame) showClock = !showClock;
             if (kb.digit1Key.wasPressedThisFrame) timeOfDay = 0.25f;
             if (kb.digit2Key.wasPressedThisFrame) timeOfDay = 0.50f;
             if (kb.digit3Key.wasPressedThisFrame) timeOfDay = 0.72f;
@@ -286,7 +290,7 @@ namespace Echo.World
 
         private void OnGUI()
         {
-            if (!enableDebugKeys) return;
+            if (!enableDebugKeys || !showClock) return;
 
             if (labelStyle == null)
             {

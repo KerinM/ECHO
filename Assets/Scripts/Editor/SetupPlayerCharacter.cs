@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Echo.Interactions;
+using Echo.Mission;
 using Echo.Player;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -20,6 +22,8 @@ namespace Echo.EditorTools
         private const string WalkingPath = AnimationsFolder + "/Walking.fbx";
         private const string RunPath = AnimationsFolder + "/Run.fbx";
         private const string RunningPath = AnimationsFolder + "/Running.fbx";
+        private const string InteractPath = AnimationsFolder + "/Interact.fbx";
+        private const string VictoryPath = AnimationsFolder + "/Victory.fbx";
         private const string MaterialFolder = "Assets/Materials/Player";
         private const string TemporaryTextureFolderName = "_TempTextures";
         private const string TemporaryTextureFolder = MaterialFolder + "/" + TemporaryTextureFolderName;
@@ -33,11 +37,18 @@ namespace Echo.EditorTools
         private const string IdleClipName = "Idle";
         private const string WalkClipName = "Walk";
         private const string RunClipName = "Run";
+        private const string InteractClipName = "Interact";
+        private const string VictoryClipName = "Victory";
         private const string SpeedParameter = "Speed";
         private const string GroundedParameter = "Grounded";
         private const string InteractParameter = "Interact";
         private const string VictoryParameter = "Victory";
         private const string LocomotionStateName = "Locomotion";
+        private const string UpperBodyLayerName = "UpperBody";
+        private const string EmptyStateName = "Empty";
+        private const string InteractStateName = "Interact";
+        private const string VictoryStateName = "Victory";
+        private const string UpperBodyMaskPath = AnimationsRoot + "/AM_UpperBody.mask";
         private const string PlayerName = "Player";
         private const string PlayerModelName = "PlayerModel";
         private const string VisualName = "Visual";
@@ -54,6 +65,8 @@ namespace Echo.EditorTools
             if (!AssetExists(IdlePath)) missing.Add(IdlePath);
             if (walkPath == null) missing.Add($"{WalkPath} o {WalkingPath}");
             if (runPath == null) missing.Add($"{RunPath} o {RunningPath}");
+            if (!AssetExists(InteractPath)) missing.Add(InteractPath);
+            if (!AssetExists(VictoryPath)) missing.Add(VictoryPath);
 
             if (missing.Count > 0)
             {
@@ -89,18 +102,24 @@ namespace Echo.EditorTools
             if (!ConfigureAnimationImporter(IdlePath, IdleClipName, avatar)) return;
             if (!ConfigureAnimationImporter(walkPath, WalkClipName, avatar)) return;
             if (!ConfigureAnimationImporter(runPath, RunClipName, avatar)) return;
+            if (!ConfigureGestureImporter(InteractPath, InteractClipName, avatar)) return;
+            if (!ConfigureGestureImporter(VictoryPath, VictoryClipName, avatar)) return;
 
             AnimationClip idleClip = LoadClip(IdlePath, IdleClipName);
             AnimationClip walkClip = LoadClip(walkPath, WalkClipName);
             AnimationClip runClip = LoadClip(runPath, RunClipName);
+            AnimationClip interactClip = LoadClip(InteractPath, InteractClipName);
+            AnimationClip victoryClip = LoadClip(VictoryPath, VictoryClipName);
 
-            if (idleClip == null || walkClip == null || runClip == null)
+            if (idleClip == null || walkClip == null || runClip == null ||
+                interactClip == null || victoryClip == null)
             {
-                Debug.LogError("[ECHO] No se pudieron cargar los clips Idle, Walk o Run después de reimportar.");
+                Debug.LogError("[ECHO] No se pudieron cargar los clips Idle, Walk, Run, " +
+                               "Interact o Victory después de reimportar.");
                 return;
             }
 
-            AnimatorController controller = EnsureController(idleClip, walkClip, runClip);
+            AnimatorController controller = EnsureController(idleClip, walkClip, runClip, interactClip, victoryClip);
             if (controller == null)
             {
                 return;
@@ -127,6 +146,9 @@ namespace Echo.EditorTools
             summary.AppendLine($"- AC_Player.controller: {SpeedParameter} (float), {GroundedParameter} (bool), " +
                                $"{InteractParameter} (trigger), {VictoryParameter} (trigger); " +
                                $"{LocomotionStateName} por defecto con {IdleClipName} 0, {WalkClipName} 4, {RunClipName} 7.");
+            summary.AppendLine($"- Gestos: {InteractClipName} en capa '{UpperBodyLayerName}' (Override, peso 1, " +
+                               $"máscara '{Path.GetFileName(UpperBodyMaskPath)}') y {VictoryClipName} en la capa base " +
+                               "desde Any State (sin salida de vuelta).");
             summary.AppendLine("- PlayerModel.prefab: Animator con AC_Player y Avatar, Apply Root Motion desactivado.");
             summary.AppendLine(sceneConfigured
                 ? $"- Escena: {sceneDetails}"
@@ -544,6 +566,95 @@ namespace Echo.EditorTools
             return true;
         }
 
+        // Igual que ConfigureAnimationImporter pero para gestos de una sola pasada:
+        // sin loop y con Bake Into Pose del root (rotación, altura Y y posición XZ).
+        private static bool ConfigureGestureImporter(string path, string clipName, Avatar avatar)
+        {
+            ModelImporter importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (importer == null)
+            {
+                Debug.LogError($"[ECHO] No se pudo obtener el ModelImporter de '{path}'.");
+                return false;
+            }
+
+            importer.animationType = ModelImporterAnimationType.Human;
+            importer.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+            importer.sourceAvatar = avatar;
+            importer.importAnimation = true;
+
+            ModelImporterClipAnimation[] clips = importer.defaultClipAnimations;
+            if (clips == null || clips.Length == 0)
+            {
+                clips = importer.clipAnimations;
+            }
+
+            if (clips == null || clips.Length == 0)
+            {
+                Debug.LogError($"[ECHO] No se encontraron clips en '{path}'.");
+                return false;
+            }
+
+            for (int i = 0; i < clips.Length; i++)
+            {
+                if (i == 0)
+                {
+                    clips[i].name = clipName;
+                }
+
+                clips[i].loopTime = false;
+                clips[i].loopPose = false;
+                clips[i].lockRootRotation = true;
+                clips[i].lockRootHeightY = true;
+                clips[i].lockRootPositionXZ = true;
+                clips[i].keepOriginalOrientation = true;
+                clips[i].keepOriginalPositionY = true;
+                clips[i].keepOriginalPositionXZ = true;
+            }
+
+            importer.clipAnimations = clips;
+            importer.SaveAndReimport();
+            return true;
+        }
+
+        // Máscara humanoide de torso, brazos y cabeza: sin piernas ni root, para que la capa
+        // UpperBody no interrumpa el caminado. Idempotente: reutiliza y reconfigura el asset.
+        private static AvatarMask EnsureUpperBodyMask()
+        {
+            AvatarMask mask = AssetDatabase.LoadAssetAtPath<AvatarMask>(UpperBodyMaskPath);
+            if (mask == null)
+            {
+                if (AssetDatabase.LoadMainAssetAtPath(UpperBodyMaskPath) != null)
+                {
+                    Debug.LogError($"[ECHO] '{UpperBodyMaskPath}' existe pero no es un AvatarMask.");
+                    return null;
+                }
+
+                mask = new AvatarMask();
+                AssetDatabase.CreateAsset(mask, UpperBodyMaskPath);
+            }
+
+            AvatarMaskBodyPart[] enabledParts =
+            {
+                AvatarMaskBodyPart.Head,
+                AvatarMaskBodyPart.Body,
+                AvatarMaskBodyPart.LeftArm,
+                AvatarMaskBodyPart.RightArm
+            };
+
+            for (int i = 0; i < (int)AvatarMaskBodyPart.LastBodyPart; i++)
+            {
+                mask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)i, false);
+            }
+
+            foreach (AvatarMaskBodyPart part in enabledParts)
+            {
+                mask.SetHumanoidBodyPartActive(part, true);
+            }
+
+            EditorUtility.SetDirty(mask);
+            return mask;
+        }
+
         private static AnimationClip LoadClip(string path, string clipName)
         {
             UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(path);
@@ -563,7 +674,9 @@ namespace Echo.EditorTools
             return clip;
         }
 
-        private static AnimatorController EnsureController(AnimationClip idle, AnimationClip walk, AnimationClip run)
+        private static AnimatorController EnsureController(
+            AnimationClip idle, AnimationClip walk, AnimationClip run,
+            AnimationClip interact, AnimationClip victory)
         {
             AnimatorController controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
 
@@ -645,10 +758,178 @@ namespace Echo.EditorTools
             blendTree.AddChild(run, 7f);
 
             stateMachine.defaultState = state;
+
+            if (!ConfigureVictoryState(controller, stateMachine, victory))
+            {
+                return null;
+            }
+
+            if (!ConfigureUpperBodyLayer(controller, interact))
+            {
+                return null;
+            }
+
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
 
             return controller;
+        }
+
+        // Capa base: Any State → Victory con el trigger Victory, sin transición de salida
+        // (la pose se mantiene hasta el reinicio). Idempotente: si ya existe la transición,
+        // se limpia y se vuelve a crear apuntando al estado correcto.
+        private static bool ConfigureVictoryState(
+            AnimatorController controller, AnimatorStateMachine stateMachine, AnimationClip victory)
+        {
+            AnimatorState victoryState = null;
+
+            for (int i = 0; i < stateMachine.states.Length; i++)
+            {
+                if (stateMachine.states[i].state.name == VictoryStateName)
+                {
+                    victoryState = stateMachine.states[i].state;
+                    break;
+                }
+            }
+
+            if (victoryState == null)
+            {
+                victoryState = stateMachine.AddState(VictoryStateName, stateMachine.anyStatePosition + new Vector3(0f, 100f, 0f));
+            }
+
+            victoryState.motion = victory;
+            victoryState.writeDefaultValues = true;
+
+            AnimatorStateTransition[] existing = stateMachine.anyStateTransitions;
+            for (int i = existing.Length - 1; i >= 0; i--)
+            {
+                if (existing[i].destinationState != null && existing[i].destinationState.name == VictoryStateName)
+                {
+                    stateMachine.RemoveAnyStateTransition(existing[i]);
+                }
+            }
+
+            AnimatorStateTransition transition = stateMachine.AddAnyStateTransition(victoryState);
+            transition.duration = 0.15f;
+            transition.hasExitTime = false;
+            transition.exitTime = 0f;
+            transition.canTransitionToSelf = false;
+            transition.conditions = new AnimatorCondition[0];
+            transition.AddCondition(AnimatorConditionMode.If, 0f, VictoryParameter);
+
+            return true;
+        }
+
+        // Capa UpperBody (peso 1, Override): estado vacío por defecto y estado Interact con
+        // el trigger Interact que vuelve al vacío por Exit Time. Si la capa existe se elimina
+        // y se recrea, evitando duplicados.
+        private static bool ConfigureUpperBodyLayer(AnimatorController controller, AnimationClip interact)
+        {
+            for (int i = controller.layers.Length - 1; i >= 1; i--)
+            {
+                if (controller.layers[i].name == UpperBodyLayerName)
+                {
+                    controller.RemoveLayer(i);
+                }
+            }
+
+            AvatarMask mask = EnsureUpperBodyMask();
+            if (mask == null)
+            {
+                return false;
+            }
+
+            // RemoveLayer no borra la sub-asset AnimatorStateMachine de la capa eliminada;
+            // esas huérfanas impiden persistir una capa nueva con el mismo nombre.
+            PurgeOrphanStateMachines(controller);
+
+            AnimatorControllerLayer layer = new AnimatorControllerLayer
+            {
+                name = UpperBodyLayerName,
+                defaultWeight = 1f,
+                avatarMask = mask,
+                blendingMode = AnimatorLayerBlendingMode.Override,
+                stateMachine = new AnimatorStateMachine()
+            };
+
+            layer.stateMachine.name = UpperBodyLayerName;
+            layer.stateMachine.hideFlags = HideFlags.HideInHierarchy;
+            controller.AddLayer(layer);
+
+            AnimatorStateMachine stateMachine = controller.layers[controller.layers.Length - 1].stateMachine;
+            if (stateMachine == null)
+            {
+                // La capa quedó con la referencia rota: recuperar la sub-asset por nombre.
+                stateMachine = AssetDatabase.LoadAllAssetsAtPath(ControllerPath)
+                    .OfType<AnimatorStateMachine>()
+                    .FirstOrDefault(machine => machine.name == UpperBodyLayerName);
+            }
+
+            if (stateMachine == null)
+            {
+                Debug.LogError($"[ECHO] No se pudo crear la capa '{UpperBodyLayerName}'.");
+                return false;
+            }
+
+            // Sin esto el build falla con "Statemachine for layer 'UpperBody' is missing":
+            // AddLayer no siempre guarda la máquina de estados como sub-asset del controller.
+            if (AssetDatabase.GetAssetPath(stateMachine) != ControllerPath)
+            {
+                AssetDatabase.AddObjectToAsset(stateMachine, controller);
+                AssetDatabase.SaveAssets();
+                AssetDatabase.ImportAsset(ControllerPath, ImportAssetOptions.ForceUpdate);
+            }
+
+            AnimatorState emptyState = stateMachine.AddState(EmptyStateName, stateMachine.entryPosition + new Vector3(0f, 100f, 0f));
+            emptyState.motion = null;
+            emptyState.writeDefaultValues = true;
+            stateMachine.defaultState = emptyState;
+
+            AnimatorState interactState = stateMachine.AddState(InteractStateName, stateMachine.entryPosition + new Vector3(250f, 100f, 0f));
+            interactState.motion = interact;
+            interactState.writeDefaultValues = true;
+
+            AnimatorStateTransition toInteract = emptyState.AddTransition(interactState);
+            toInteract.duration = 0.1f;
+            toInteract.hasExitTime = false;
+            toInteract.exitTime = 0f;
+            toInteract.conditions = new AnimatorCondition[0];
+            toInteract.AddCondition(AnimatorConditionMode.If, 0f, InteractParameter);
+
+            AnimatorStateTransition toEmpty = interactState.AddTransition(emptyState);
+            toEmpty.duration = 0.15f;
+            toEmpty.hasExitTime = true;
+            toEmpty.exitTime = 1f;
+
+            return true;
+        }
+
+        // Elimina las AnimatorStateMachine guardadas como sub-assets de AC_Player.controller
+        // que ninguna capa referencia (restos de RemoveLayer en ejecuciones anteriores).
+        private static void PurgeOrphanStateMachines(AnimatorController controller)
+        {
+            HashSet<AnimatorStateMachine> referenced = new HashSet<AnimatorStateMachine>();
+            AnimatorControllerLayer[] layers = controller.layers;
+            for (int i = 0; i < layers.Length; i++)
+            {
+                if (layers[i].stateMachine != null)
+                {
+                    referenced.Add(layers[i].stateMachine);
+                }
+            }
+
+            AnimatorStateMachine[] stored = AssetDatabase.LoadAllAssetsAtPath(ControllerPath)
+                .OfType<AnimatorStateMachine>()
+                .ToArray();
+
+            for (int i = 0; i < stored.Length; i++)
+            {
+                if (stored[i] == null || referenced.Contains(stored[i])) continue;
+
+                Debug.LogWarning($"[ECHO] PurgeOrphanStateMachines: eliminando la máquina de estados " +
+                                 $"huérfana '{stored[i].name}' de '{ControllerPath}'.");
+                UnityEngine.Object.DestroyImmediate(stored[i], true);
+            }
         }
 
         private static GameObject EnsurePlayerModelPrefab(Avatar avatar, AnimatorController controller)
@@ -801,6 +1082,8 @@ namespace Echo.EditorTools
             controllerProperty.objectReferenceValue = characterController;
             serialized.ApplyModifiedProperties();
 
+            bool reactionsOk = ConfigurePlayerReactions(player, playerAnimator);
+
             EditorSceneManager.MarkSceneDirty(player.scene);
             Undo.CollapseUndoOperations(undoGroup);
 
@@ -809,8 +1092,50 @@ namespace Echo.EditorTools
 
             details = $"'{PlayerName}': {VisualName} {(removedVisual ? "eliminado" : "no existía")}, " +
                       $"{FacingMarkerName} {(removedFacingMarker ? "eliminado" : "no existía")}, " +
-                      $"{PlayerModelName} {(removedPlayerModel ? "recreado" : "creado")} en 0/0/0 escala 1 " +
-                      "y PlayerAnimator asignado.";
+                      $"{PlayerModelName} {(removedPlayerModel ? "recreado" : "creado")} en 0/0/0 escala 1, " +
+                      "PlayerAnimator asignado " +
+                      $"y PlayerReactions {(reactionsOk ? "asignado" : "NO asignado (ver consola)")}.";
+            return true;
+        }
+
+        // Añade (una sola vez) PlayerReactions al Player y le asigna las referencias para
+        // disparar los gestos de interacción y de victoria.
+        private static bool ConfigurePlayerReactions(GameObject player, PlayerAnimator playerAnimator)
+        {
+            PlayerReactions reactions = player.GetComponent<PlayerReactions>();
+            if (reactions == null)
+            {
+                reactions = Undo.AddComponent<PlayerReactions>(player);
+            }
+
+            InteractionController interactionController =
+                UnityEngine.Object.FindAnyObjectByType<InteractionController>(FindObjectsInactive.Include);
+            MissionManager missionManager =
+                UnityEngine.Object.FindAnyObjectByType<MissionManager>(FindObjectsInactive.Include);
+
+            if (interactionController == null || missionManager == null)
+            {
+                Debug.LogError("[ECHO] Setup Player Character: no se encontró InteractionController o " +
+                               "MissionManager en la escena; PlayerReactions quedará sin referencias.");
+                return false;
+            }
+
+            SerializedObject serialized = new SerializedObject(reactions);
+            SerializedProperty interactionProperty = serialized.FindProperty("interactionController");
+            SerializedProperty missionProperty = serialized.FindProperty("missionManager");
+            SerializedProperty animatorProperty = serialized.FindProperty("playerAnimator");
+
+            if (interactionProperty == null || missionProperty == null || animatorProperty == null)
+            {
+                Debug.LogError("[ECHO] PlayerReactions no tiene las propiedades serializadas " +
+                               "'interactionController', 'missionManager' y 'playerAnimator'.");
+                return false;
+            }
+
+            interactionProperty.objectReferenceValue = interactionController;
+            missionProperty.objectReferenceValue = missionManager;
+            animatorProperty.objectReferenceValue = playerAnimator;
+            serialized.ApplyModifiedProperties();
             return true;
         }
 

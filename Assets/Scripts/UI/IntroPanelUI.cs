@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using TMPro;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Echo.UI
@@ -10,6 +11,8 @@ namespace Echo.UI
     public class IntroPanelUI : MonoBehaviour
     {
         [SerializeField] private CanvasGroup panel;
+        [Tooltip("Texto pequeño de créditos (opcional). Lo crea Tools/ECHO/Setup Credits.")]
+        [SerializeField] private TMP_Text creditsText;
         [SerializeField] private float visibleSeconds = 8f;
         [SerializeField] private float fadeSeconds = 1f;
 
@@ -23,6 +26,12 @@ namespace Echo.UI
                 Debug.LogError("IntroPanelUI: falta asignar 'Panel' (el CanvasGroup de IntroPanel).", this);
                 enabled = false;
                 return;
+            }
+
+            if (creditsText == null)
+            {
+                Debug.LogWarning("IntroPanelUI: sin 'Credits Text' asignado; no se mostrarán los créditos. " +
+                                 "Ejecuta Tools/ECHO/Setup Credits.", this);
             }
 
             panel.alpha = 1f;
